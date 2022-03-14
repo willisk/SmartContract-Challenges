@@ -12,6 +12,8 @@
     "@openzeppelin/contracts": "^4.5.0"
   },
   "scripts": {
-    "test": "npx hardhat test"
+    "test": "npx hardhat test",
+    "exclusive": "npx hardhat test test/exclusive.js",
+    "orderbook": "npx hardhat test test/orderbook.js"
   }
 }

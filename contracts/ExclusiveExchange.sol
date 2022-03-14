@@ -1,11 +1,15 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
-import 'hardhat/console.sol';
 import '@openzeppelin/contracts/token/ERC721/ERC721.sol';
 
 contract ExclusiveNFT is ERC721('SoVIP', 'SoExclusive') {
     uint256 counter;
+    uint256 price;
+
+    constructor(uint256 price_) {
+        price = price_;
+    }
 
     function mint() external payable {
         require(msg.value >= 1 ether);
@@ -21,77 +25,73 @@ contract ExclusiveExchange {
         uint256 price;
     }
 
-    ExclusiveNFT[] public memberCollections;
+    mapping(uint256 => ExclusiveNFT) public memberCollections;
 
     mapping(uint256 => mapping(uint256 => Offer)) offers;
     mapping(address => uint256) accountData;
 
     // accountData:
-    // 0xRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRCCCCCCCCCCCCCCCCMMMMMMMMMMMMMMMM
-    // M: membership Id
-    // C: creation date
+    // 0xRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+    // T: Tier
     // R: rewards
 
     // basically bitmaps because my twitter feed is full of @t11 and Russia made gas expensive
 
     constructor() payable {
         require(msg.value == 50 ether);
-        for (uint256 i; i < 3; i++) memberCollections.push(new ExclusiveNFT());
-    }
-
-    /* ------------- Memberships ------------ */
-
-    function registerMember(uint256 collection) external {
-        require(accountData[msg.sender] == 0, 'Ser, you already registered.');
-
-        uint256 newAccountData = ((block.timestamp << 64) | collection);
-        require(isVIP(msg.sender, newAccountData), 'Ser, you are not welcome, pls leave.');
-
-        accountData[msg.sender] = newAccountData;
+        for (uint256 i = 1; i < 4; i++) memberCollections[i] = new ExclusiveNFT(i * 1 ether);
     }
 
     /* ------------- Exchange ------------ */
 
     function offerNFT(
-        uint256 collection,
+        uint256 tier,
         uint256 tokenId,
         uint256 price
     ) public onlyVIP {
         require(price >= 1 ether, 'No undercutting pls');
 
-        memberCollections[collection].transferFrom(msg.sender, address(this), tokenId);
-        offers[collection][tokenId] = Offer(msg.sender, price);
+        memberCollections[tier].transferFrom(msg.sender, address(this), tokenId);
+        offers[tier][tokenId] = Offer(msg.sender, price);
 
-        accountData[msg.sender] += uint256(1) << 128; // reward user
+        accountData[msg.sender] += uint256(1) << 128; // store number of trades for rewards
     }
 
-    function buyNFT(uint256 collection, uint256 tokenId) public payable onlyVIP {
-        Offer storage offer = offers[collection][tokenId];
-        require(msg.value >= offer.price);
+    function buyNFT(uint256 tier, uint256 tokenId) public payable onlyVIP {
+        Offer memory offer = offers[tier][tokenId];
+        require(msg.value >= offer.price, "Ser, where's the money?");
 
-        memberCollections[collection].transferFrom(address(this), msg.sender, tokenId);
-        payable(offer.owner).transfer((offer.price * 8) / 10);
+        memberCollections[tier].transferFrom(address(this), msg.sender, tokenId);
+        payable(offer.owner).transfer((offer.price * 8) / 10); // 20% tax
 
-        accountData[msg.sender] += uint256(1) << 128;
+        accountData[msg.sender] += uint256(1) << 128; // reward user
 
-        delete offers[collection][tokenId];
+        delete offers[tier][tokenId];
     }
 
     /* ------------- Rewards ------------ */
 
     function claimRewards() external onlyVIP {
         uint256 data = accountData[msg.sender];
+
+        uint256 tier = uint128(data);
         uint256 numRewards = data >> 128;
 
-        payable(msg.sender).transfer(numRewards * 0.01 ether);
-        accountData[msg.sender] &= ~(type(uint256).max << 128); // wipe rewards
+        payable(msg.sender).transfer(numRewards * tier * 0.01 ether);
+        accountData[msg.sender] &= type(uint128).max; // wipe rewards
     }
 
-    /* ------------- Internal ------------ */
+    /* ------------- Memberships ------------ */
 
+    function registerMember(uint256 tier) external {
+        require(isVIP(msg.sender, tier), 'Ser, you are not welcome, pls leave.');
+        accountData[msg.sender] = tier;
+    }
+
+    // user must still be a valid holder for every interaction
     function isVIP(address user, uint256 data) private view returns (bool) {
-        uint256 collection = data & 0xFFFFFFFFFFFFFFFF;
-        return memberCollections[collection].balanceOf(user) > 0;
+        uint256 tier = uint128(data);
+        return memberCollections[tier].balanceOf(user) > 0;
     }
 
     modifier onlyVIP() {
