@@ -1,15 +1,17 @@
-# Basic Sample Hardhat Project
+# SmartContract Challenges
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.
-
-Try running some of the following tasks:
+Install the dependencies with
 
 ```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-node scripts/sample-script.js
-npx hardhat help
+yarn
+```
+
+Fill in the code in test/{challenge}.js under the test "Attack!".
+Perhaps you might have to deploy custom contracts, I don't know.
+
+Testing whether the challenge is complete:
+
+```shell
+yarn exclusive
+yarn orderbook
 ```
